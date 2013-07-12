@@ -2,23 +2,12 @@ package xmlutil
 
 import (
 	"encoding/xml"
-	"io"
 	"reflect"
 	"strings"
 	"sync"
 )
 
-type XmlUtil interface {
-	RegisterType(value interface{})
-	RegisterTypeMore(value interface{}, name xml.Name, attrs []xml.Attr)
-	RegisterNamespace(prefix, uri string)
-	Marshal(v interface{}) ([]byte, error)
-	Unmarshal(data []byte, v interface{}) error
-	NewEncoder(w io.Writer) *Encoder
-	NewDecoder(r io.Reader) *Decoder
-}
-
-type xmlutil struct {
+type XmlUtil struct {
 	typeMap     map[reflect.Type]*typeInfo
 	typeLock    sync.RWMutex
 	nsPrefixMap map[string]string
@@ -47,19 +36,19 @@ const (
 	fOmitEmpty
 )
 
-func NewXmlUtil() XmlUtil {
-	return &xmlutil{
+func NewXmlUtil() *XmlUtil {
+	return &XmlUtil{
 		typeMap:     make(map[reflect.Type]*typeInfo),
 		nsPrefixMap: map[string]string{"xmlns": "xmlns"},
 		nsUriMap:    map[string]string{"xmlns": "xmlns"},
 	}
 }
 
-func (x *xmlutil) RegisterType(value interface{}) {
+func (x *XmlUtil) RegisterType(value interface{}) {
 	x.RegisterTypeMore(value, xml.Name{}, nil)
 }
 
-func (x *xmlutil) RegisterTypeMore(value interface{}, name xml.Name, attrs []xml.Attr) {
+func (x *XmlUtil) RegisterTypeMore(value interface{}, name xml.Name, attrs []xml.Attr) {
 	typ := reflect.TypeOf(value)
 	x.typeLock.RLock()
 	_, ok := x.typeMap[typ]
@@ -70,7 +59,12 @@ func (x *xmlutil) RegisterTypeMore(value interface{}, name xml.Name, attrs []xml
 	x.registerType(typ, name, attrs)
 }
 
-func (x *xmlutil) registerType(typ reflect.Type, name xml.Name, attrs []xml.Attr) (*typeInfo, error) {
+func (x *XmlUtil) registerType(typ reflect.Type, name xml.Name, attrs []xml.Attr) (*typeInfo, error) {
+	kind := typ.Kind()
+	if kind == reflect.Ptr || kind == reflect.Interface {
+		return x.registerType(typ.Elem(), name, attrs)
+	}
+
 	if name.Local == "" {
 		name.Local = typ.Name()
 	}
@@ -86,7 +80,12 @@ func (x *xmlutil) registerType(typ reflect.Type, name xml.Name, attrs []xml.Attr
 	return ti, nil
 }
 
-func (x *xmlutil) getTypeInfo(typ reflect.Type) (*typeInfo, error) {
+func (x *XmlUtil) getTypeInfo(typ reflect.Type) (*typeInfo, error) {
+	kind := typ.Kind()
+	if kind == reflect.Ptr || kind == reflect.Interface {
+		return x.getTypeInfo(typ.Elem())
+	}
+
 	x.typeLock.RLock()
 	ti, ok := x.typeMap[typ]
 	x.typeLock.RUnlock()
@@ -96,7 +95,7 @@ func (x *xmlutil) getTypeInfo(typ reflect.Type) (*typeInfo, error) {
 	return x.registerType(typ, xml.Name{}, nil)
 }
 
-func (x *xmlutil) getTypeByName(name xml.Name) reflect.Type {
+func (x *XmlUtil) getTypeByName(name xml.Name) reflect.Type {
 	x.typeLock.RLock()
 	defer x.typeLock.RUnlock()
 	for typ, ti := range x.typeMap {
@@ -107,7 +106,7 @@ func (x *xmlutil) getTypeByName(name xml.Name) reflect.Type {
 	return nil
 }
 
-func (x *xmlutil) getFields(typ reflect.Type) []fieldInfo {
+func (x *XmlUtil) getFields(typ reflect.Type) []fieldInfo {
 	n := typ.NumField()
 	fields := make([]fieldInfo, 0, n)
 	for i := 0; i < n; i++ {
@@ -153,20 +152,20 @@ func (x *xmlutil) getFields(typ reflect.Type) []fieldInfo {
 	return fields
 }
 
-func (x *xmlutil) RegisterNamespace(uri, prefix string) {
+func (x *XmlUtil) RegisterNamespace(uri, prefix string) {
 	x.nsLock.Lock()
 	x.nsPrefixMap[uri] = prefix
 	x.nsUriMap[prefix] = uri
 	x.nsLock.Unlock()
 }
 
-func (x *xmlutil) lookupPrefix(uri string) string {
+func (x *XmlUtil) lookupPrefix(uri string) string {
 	x.nsLock.RLock()
 	defer x.nsLock.RUnlock()
 	return x.nsPrefixMap[uri]
 }
 
-func (x *xmlutil) lookupNamespaceUri(prefix string) string {
+func (x *XmlUtil) lookupNamespaceUri(prefix string) string {
 	x.nsLock.RLock()
 	defer x.nsLock.RUnlock()
 	return x.nsUriMap[prefix]

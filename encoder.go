@@ -18,7 +18,7 @@ func (typeError *UnsupportedTypeError) Error() string {
 	return "xmlutil: unsupported type: " + typeError.Type.String()
 }
 
-func (x *xmlutil) Marshal(v interface{}) ([]byte, error) {
+func (x *XmlUtil) Marshal(v interface{}) ([]byte, error) {
 	var b bytes.Buffer
 	if err := x.NewEncoder(&b).Encode(v); err != nil {
 		return nil, err
@@ -27,11 +27,11 @@ func (x *xmlutil) Marshal(v interface{}) ([]byte, error) {
 }
 
 type Encoder struct {
-	xmlutil *xmlutil
+	xmlutil *XmlUtil
 	writer  *bufio.Writer
 }
 
-func (x *xmlutil) NewEncoder(w io.Writer) *Encoder {
+func (x *XmlUtil) NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{x, bufio.NewWriter(w)}
 }
 

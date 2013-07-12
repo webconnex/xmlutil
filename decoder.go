@@ -24,16 +24,16 @@ func (typeError *UnknownTypeError) Error() (msg string) {
 	return
 }
 
-func (x *xmlutil) Unmarshal(data []byte, v interface{}) error {
+func (x *XmlUtil) Unmarshal(data []byte, v interface{}) error {
 	return x.NewDecoder(bytes.NewBuffer(data)).Decode(v)
 }
 
 type Decoder struct {
-	xmlutil *xmlutil
+	xmlutil *XmlUtil
 	parser  *xml.Decoder
 }
 
-func (x *xmlutil) NewDecoder(r io.Reader) *Decoder {
+func (x *XmlUtil) NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{x, xml.NewDecoder(r)}
 }
 
@@ -142,6 +142,7 @@ func (d *Decoder) unmarshal(val reflect.Value, start *xml.StartElement) error {
 			return err
 		}
 	case reflect.Interface:
+		println(start.Name.Local)
 		ntyp := d.xmlutil.getTypeByName(start.Name)
 		if ntyp == nil {
 			break
